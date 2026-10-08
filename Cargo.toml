@@ -1,0 +1,15 @@
+[package]
+name = "flyer-stun-turn"
+version = "0.0.0"
+authors = ["Themba Lucas Ngubeni <thembangubeni04@email.com>"]
+license = "MIT"
+description = ""
+edition = "2024"
+
+[dependencies]
+rand = "0.10.3"
+tokio = { version = "1.53.2", features = ["full"] }
+
+flyer = "3.2.0"
+flyer-event-emitter = "0.0.1"
+serde = "1.0.229"

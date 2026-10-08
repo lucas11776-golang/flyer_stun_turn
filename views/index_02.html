@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom STUN/TURN WebRTC Video Client</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      width: 100%;
+      max-width: 900px;
+      margin-top: 20px;
+    }
+    .video-container {
+      position: relative;
+      background: #1e1e1e;
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .label {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #startBtn { background-color: #2563eb; color: white; }
+    #callBtn { background-color: #16a34a; color: white; }
+    #status { margin-top: 15px; color: #a1a1aa; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+  <h2>WebRTC Video Chat (Custom STUN/TURN)</h2>
+
+  <div class="controls">
+    <button id="startBtn" onclick="startCamera()">1. Start Camera</button>
+    <button id="callBtn" onclick="createOffer()">2. Start Video Call</button>
+  </div>
+
+  <div id="status">Status: Waiting to access camera...</div>
+
+  <div class="video-grid">
+    <div class="video-container">
+      <video id="localVideo" autoplay playsinline muted></video>
+      <div class="label">Local Stream ( You )</div>
+    </div>
+    <div class="video-container">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <div class="label">Remote Peer Stream</div>
+    </div>
+  </div>
+
+  <script>
+    const rtcConfig = {
+        iceServers: [
+            { urls: 'stun:127.0.0.1:3478' },
+            { urls: 'turn:127.0.0.1:3478', username: 'testuser', credential: 'testpassword' }
+        ],
+        iceTransportPolicy: 'all'
+    };
+
+    let localStream;
+    let peerConnection;
+    let ws;
+
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const statusDiv = document.getElementById('status');
+
+    function initSignaling() {
+      ws = new WebSocket(`ws://127.0.0.1:8888/1?user_id=2`);
+
+      ws.onmessage = async (event) => {
+        const message = JSON.parse(event.data);
+
+        if (message.offer) {
+          statusDiv.innerText = 'Status: Received Offer. Sending Answer...';
+          await setupPeerConnection();
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          ws.send(JSON.stringify({ answer }));
+        } 
+        else if (message.answer) {
+          statusDiv.innerText = 'Status: Connected! Streaming media...';
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+        } 
+        else if (message.candidate) {
+          if (peerConnection) {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+          }
+        }
+      };
+    }
+
+    async function startCamera() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localVideo.srcObject = localStream;
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('callBtn').disabled = false;
+        statusDiv.innerText = 'Status: Camera active. Ready to connect.';
+        initSignaling();
+      } catch (err) {
+        statusDiv.innerText = 'Error accessing camera: ' + err.message;
+      }
+    }
+
+    async function setupPeerConnection() {
+      if (peerConnection) {
+        return;
+      }
+
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      peerConnection.ontrack = (event) => {
+        if (!remoteVideo.srcObject) {
+          remoteVideo.srcObject = event.streams[0];
+        }
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log('[ICE Candidate Found]:', event.candidate.type, event.candidate.address);
+          ws.send(JSON.stringify({ candidate: event.candidate }));
+        }
+      };
+
+      peerConnection.oniceconnectionstatechange = () => {
+        statusDiv.innerText = `ICE Connection State: ${peerConnection.iceConnectionState}`;
+      };
+    }
+
+    async function createOffer() {
+      document.getElementById('callBtn').disabled = true;
+      statusDiv.innerText = 'Status: Gathering ICE Candidates & Calling...';
+
+      await setupPeerConnection();
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      
+      ws.send(JSON.stringify({ offer }));
+    }
+  </script>
+</body>
+</html>
