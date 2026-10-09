@@ -1,6 +1,6 @@
 use std::sync::{Arc, LazyLock};
 
-use flyer::{Response, Websocket, server, websocket::Socket};
+use flyer::{Response, Websocket, server, server_tls, utils::env::{self, load}, websocket::Socket};
 use flyer_event_emitter::{AsyncCallback, Bytes, EventEmitter, Subscription};
 use serde::{Serialize, de::DeserializeOwned};
 use tokio::sync::RwLock;
@@ -34,7 +34,13 @@ where
 }
 
 pub fn main() {
-    let server = server("127.0.0.1", 8888)
+    load(".env");
+
+    let host = env::env("HOST");
+    let port = env::env("WEB_HOST_PORT");
+
+    // let server = server("127.0.0.1", 8888)
+    let server = server_tls(host, port.parse().unwrap(), "host.key", "host.cert")
         .view("views");
 
     server.router().group("/", |router| {

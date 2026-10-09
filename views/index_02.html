@@ -84,10 +84,13 @@
   </div>
 
   <script>
+    const WEB_HOST = `{{ env(name="HOST") }}:{{ env(name="WEB_HOST_PORT") }}`;
+    const STUN_HOST = `{{ env(name="HOST") }}:{{ env(name="STUN_HOST_PORT") }}`;
+
     const rtcConfig = {
         iceServers: [
-            { urls: 'stun:127.0.0.1:3478' },
-            { urls: 'turn:127.0.0.1:3478', username: 'testuser', credential: 'testpassword' }
+            { urls: `stun:${STUN_HOST}` },
+            { urls: `turn:${STUN_HOST}`, username: 'testuser', credential: 'testpassword' }
         ],
         iceTransportPolicy: 'all'
     };
@@ -101,7 +104,7 @@
     const statusDiv = document.getElementById('status');
 
     function initSignaling() {
-      ws = new WebSocket(`ws://127.0.0.1:8888/1?user_id=2`);
+      ws = new WebSocket(`wss://${WEB_HOST}/1?user_id=2`);
 
       ws.onmessage = async (event) => {
         const message = JSON.parse(event.data);
