@@ -25,7 +25,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let packet = &buf[..len];
 
-
         match is_packet_allowed(packet) {
             Action::Allow => {
                 if let Err(e) = dev.send(packet) {
@@ -41,7 +40,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 
 fn is_packet_allowed(packet: &[u8]) -> Action {
-    let slice = etherparse::SlicedPacket::from_ip(packet).ok()?;
+    let slice = etherparse::SlicedPacket::from_ip(packet)
+        .ok()
+        .unwrap();
 
     println!("INCOMING PACKET");
 
@@ -49,17 +50,15 @@ fn is_packet_allowed(packet: &[u8]) -> Action {
         return Action::Drop
     };
 
-    let payload  = match payload {
-        etherparse::NetSlice::Ipv4(ipv4) => {
+    match payload {
+        etherparse::NetSlice::Ipv4(_ipv4) => {
             Action::Allow
         },
-        etherparse::NetSlice::Ipv6(_) => {
+        etherparse::NetSlice::Ipv6(_ipv6) => {
             Action::Allow
         },
-        etherparse::NetSlice::Arp(_) => {
+        etherparse::NetSlice::Arp(_arp) => {
             Action::Allow
         },
-    };
-
-    Action::Allow
+    }
 }
