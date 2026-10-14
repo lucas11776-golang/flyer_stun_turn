@@ -13,3 +13,8 @@ tokio = { version = "1.53.2", features = ["full"] }
 flyer = "3.2.0"
 flyer-event-emitter = "0.0.1"
 serde = "1.0.229"
+tun-tap = "0.1.4"
+pfctl = "0.7.0"
+pcap = "2.5.0"
+tun-rs = "2.8.11"
+etherparse = "0.21.0"

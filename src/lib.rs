@@ -176,7 +176,7 @@ impl StunAttribute {
                     .map_err(|_| "Invalid UTF-8 error reason")?
                     .to_string();
 
-                Ok(StunAttribute::ErrorCode { code, reason })
+                Ok(StunAttribute::ErrorCode { code: code, reason: reason })
             },
 
             STUN_ATTRIBUTE_TYPE_UNKNOWN_ATTRIBUTES => {
@@ -249,7 +249,10 @@ impl StunAttribute {
         let val_start = out.len();
 
         match self {
-            StunAttribute::Reserved => {},
+            StunAttribute::Reserved => 
+            {
+                
+            },
 
             StunAttribute::MappedAddress(addr)
                 | StunAttribute::ResponseAddress(addr)
@@ -463,9 +466,12 @@ pub fn parse_stun_packet(buf: &[u8]) -> Option<(u16, [u8; 12], Vec<StunAttribute
         let attr_len = u16::from_be_bytes([buf[offset + 2], buf[offset + 3]]) as usize;
         let val_start = offset + 4;
 
-        if val_start + attr_len > 20 + msg_len { break; }
+        if val_start + attr_len > 20 + msg_len {
+            break;
+        }
 
         let val_slice = &buf[val_start..val_start + attr_len];
+
         if let Ok(attr) = StunAttribute::parse(attr_type, val_slice, MAGIC_COOKIE, &tx_id) {
             attributes.push(attr);
         }
@@ -672,7 +678,6 @@ impl Server {
     }
 }
 
-
 pub fn server(host: impl Into<String>, port: u64) -> Server {
     Server::new(ServerConfig {
         host: host.into(),
@@ -681,7 +686,6 @@ pub fn server(host: impl Into<String>, port: u64) -> Server {
         cert_path: None,
     })
 }
-
 
 pub fn server_tls(host: impl Into<String>, port: u64, key_path: impl Into<String>, cert_path: impl Into<String>) -> Server {
     Server::new(ServerConfig {

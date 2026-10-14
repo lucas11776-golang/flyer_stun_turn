@@ -1,21 +1,65 @@
-use flyer::server;
-use flyer::utils::env::{env, load};
+use std::error::Error;
+use tun_rs::DeviceBuilder;
 
-///
-/// TODO:
-/// 
-/// fn server     [host:String, port:u64]                          -> Server
-/// fn server_tls [host:String, port:u64, key:String, cert:String] -> Server
-/// fn listen     []                                               -> Void
-/// 
-/// 
-fn main() {
-    load(".env");
+enum Action {
+    Allow,
+    Drop,
+}
 
-    let server = server(env("HOST"),  env("STUN_HOST_PORT").parse().unwrap());
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let dev = DeviceBuilder::new()
+        .ipv4("10.8.0.1", 24, None)
+        .build_sync()?;
+
+    let mut buf = vec![0u8; 65536];
+
+    loop {
+        let len = match dev.recv(&mut buf) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("Error reading from TUN device: {}", e);
+                continue;
+            }
+        };
+
+        let packet = &buf[..len];
 
 
-    println!("\r\n\r\nRunning Server: {}\r\n\r\n", server.address());
-    
-    server.listen();
+        match is_packet_allowed(packet) {
+            Action::Allow => {
+                if let Err(e) = dev.send(packet) {
+                    eprintln!("Failed to write packet back: {}", e);
+                }
+            },
+            Action::Drop => {
+                println!("[Packet]: blocked now allowed by rules..");
+            },
+        }
+    }
+}
+
+
+fn is_packet_allowed(packet: &[u8]) -> Action {
+    let slice = etherparse::SlicedPacket::from_ip(packet).ok()?;
+
+    println!("INCOMING PACKET");
+
+    let Some(payload) = slice.net else {
+        return Action::Drop
+    };
+
+    let payload  = match payload {
+        etherparse::NetSlice::Ipv4(ipv4) => {
+            Action::Allow
+        },
+        etherparse::NetSlice::Ipv6(_) => {
+            Action::Allow
+        },
+        etherparse::NetSlice::Arp(_) => {
+            Action::Allow
+        },
+    };
+
+    Action::Allow
 }
